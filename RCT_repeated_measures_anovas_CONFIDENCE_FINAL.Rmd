@@ -1,0 +1,153 @@
+---
+title: "RCT Experiment"
+author: "Graham Albert"
+date: "October 30, 2018"
+output: html_document
+---
+
+####To load required packarges
+```{r}
+require(curl) 
+```
+######loading data
+```{r}
+require(mice)
+```
+######missing data
+```{r}
+require(GPArotation)
+```
+#####for more advanced rotation.
+```{r}
+require(dplyr)
+```
+####for data manipulation.
+```{r}
+require(yaml)
+require(stringi)
+```
+####for correlation plot depiction.
+```{r}
+require(gplots)
+require(ggplot2)
+require(gridExtra)
+require(moments)
+```
+
+###modeling
+```{r}
+require(psych)##for EFA, and descriiptivves
+require(BaylorEdPsych)####for missing value analysis
+```
+
+
+###To read in the data
+```{r}
+f <- curl("https://raw.githubusercontent.com/GrahamAlbert/Rapid-Classification-Task-Data/master/RCT_MASTER_MERGED_LONG_20200918.csv")
+RCT_ANOVAS_MASTER<- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+View(RCT_ANOVAS_MASTER)
+head(RCT_ANOVAS_MASTER)
+names(RCT_ANOVAS_MASTER)
+```
+
+####To determine variable names of the data set.
+```{r}
+names(RCT_ANOVAS_MASTER)[1]<-"ID"
+names(RCT_ANOVAS_MASTER)
+View(RCT_ANOVAS_MASTER)
+```
+
+
+
+
+
+####To obtain the descriptive statistics includinag the skewness and kurtosis values of the variables.
+```{r}
+require(psych)
+normalityassessment = describe(RCT_ANOVAS_MASTER_REDUCED[c(6,7)])
+View(normalityassessment)
+```
+
+
+
+
+####To screening for missing values.
+####To write a funtion to check for missng data.
+```{r}
+percentmiss=function(x){sum(is.na(x)/length(x))*100}
+```
+
+
+####To check for missing data by columns
+```{r}
+apply(RCT_ANOVAS_MASTER,2,percentmiss)
+```
+
+####To screen for multivariate outliers.
+####To screen for multivariate outliers in the data set nomiss we will use mahalanobis distance statistic.
+```{r}
+mahal = mahalanobis(RCT_ANOVAS_MASTER[c(6,7)],
+                    colMeans(RCT_ANOVAS_MASTER[c(6,7)], na.rm=TRUE),
+                    cov(RCT_ANOVAS_MASTER[c(6,7)], use = "pairwise.complete.obs"))
+cutoff = qchisq(1-0.001, ncol(RCT_ANOVAS_MASTER[c(6,7)])) #####generates cutoff score
+ncol(RCT_ANOVAS_MASTER[c(6,7)]) #####determines df
+table(mahal<cutoff)
+```
+
+
+
+
+
+###Multivariate assumption set up.
+```{r}
+set.seed(20)
+random = rchisq(nrow(RCT_ANOVAS_MASTER_REDUCED[c(6,7)]),7)
+fake = lm(random ~.,data=RCT_ANOVAS_MASTER_REDUCED[c(6,7)])###Predict random errors which are randomly distribued
+standardized = rstudent(fake) ###Standarized residuals.
+fitted = scale(fake$fitted.values) ###To scale the values
+```
+####To test for linearity.
+```{r}
+qqnorm(standardized)
+abline(0,1)
+```
+####Based on  qq plot we have linearity.
+####To test for normality.
+```{r}
+hist(standardized)
+```
+####Our variables are linear so we procede to test homogenity of vairance.
+####Homogenity of Variance.
+```{r}
+plot(fitted, standardized)
+abline(0,0)
+abline(v=0)
+```
+####Get the names in the data set.
+```{r}
+names(RCT_ANOVAS_MASTER)
+```
+
+###To factor variables.
+```{r}
+RCT_ANOVAS_MASTER = mutate(RCT_ANOVAS_MASTER, ID=as.factor(ID), FACE_SET = as.factor(FACE_SET), MORPH_TYPE= as.factor(MORPH_TYPE),FACE_SHAPE = as.factor(FACE_SHAPE))
+View(RCT_ANOVAS_MASTER)
+```
+
+```{r}
+require(ez)
+options(scipen=9999)
+CON1_ANOVA = ezANOVA(data=RCT_ANOVAS_MASTER,
+                dv =.(CON_2),
+                wid =.(ID),
+                within = .(MORPH_TYPE),
+                between = .(FACE_SHAPE),
+                observed = NULL,
+                diff = NULL,
+                reverse_diff = FALSE,
+                type = 3,
+                white.adjust = FALSE,
+                detailed = FALSE,
+                return_aov = FALSE)
+CON1_ANOVA
+```

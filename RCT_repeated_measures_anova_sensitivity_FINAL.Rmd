@@ -1,0 +1,194 @@
+---
+title: "RCT Experiment"
+author: "Graham Albert"
+date: "October 30, 2018"
+output: html_document
+---
+
+####To load required packarges
+```{r}
+require(curl) 
+```
+######loading data
+```{r}
+require(mice)
+```
+######missing data
+```{r}
+require(GPArotation)
+```
+#####for more advanced rotation.
+```{r}
+require(dplyr)
+```
+####for data manipulation.
+```{r}
+require(yaml)
+require(stringi)
+```
+####for correlation plot depiction.
+```{r}
+require(gplots)
+require(ggplot2)
+require(gridExtra)
+require(moments)
+```
+
+###modeling
+```{r}
+require(psych)##for EFA, and descriiptivves
+require(BaylorEdPsych)####for missing value analysis
+```
+
+
+###To read in the data
+```{r}
+f <- curl("https://raw.githubusercontent.com/GrahamAlbert/RCT/master/Recognition_Memory_Data_Totals_Frequency_COMBINED_20191103.csv")
+RCT_ANOVAS_MASTER<- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+View(RCT_ANOVAS_MASTER)
+head(RCT_ANOVAS_MASTER)
+names(RCT_ANOVAS_MASTER)
+```
+
+####To determine variable names of the data set.
+```{r}
+names(RCT_ANOVAS_MASTER)[1]<-"ID"
+names(RCT_ANOVAS_MASTER)
+View(RCT_ANOVAS_MASTER)
+```
+
+###Now that we have assessed the assumptions of multi-variate analysis we will transform the data back into long format.
+```{r}
+require(dplyr)
+RCT_ANOVAS_MASTER_REDUCED <-RCT_ANOVAS_MASTER%>% 
+select(ID, Face_Morph, Face_Set, Face_Set_Type, Resoponse_Type, Frequency)
+RCT_ANOVAS_MASTER_REDUCED
+```
+
+###To factor variables.
+```{r}
+RCT_ANOVAS_MASTER_REDUCED = mutate(RCT_ANOVAS_MASTER_REDUCED, ID=as.factor(ID), Face_Set = as.factor(Face_Set), Face_Morph= as.factor(Face_Morph),Face_Set_Type=as.factor(Face_Set_Type), Resoponse_Type=as.factor(Resoponse_Type))
+View(RCT_ANOVAS_MASTER_REDUCED)
+```
+
+###To only include complete case.
+```{R}
+RCT_ANOVAS_MASTER.complete <- RCT_ANOVAS_MASTER_REDUCED[complete.cases(RCT_ANOVAS_MASTER_REDUCED),]
+View(RCT_ANOVAS_MASTER.complete)
+```
+####First we will rehsahpe the data from long to wide format to assess respondents accuracy. We will remove any subject whoses accuracy is less or equal to 50% as they did not perform above chance levels.
+
+####First we will rehsahpe the data from long to wide format to assess respondents accuracy. We will remove any subject whoses accuracy is less or equal to 50% as they did not perform above chance levels.
+```{r}
+require(stringi)
+require(tidyr)
+require(dplyr)
+require(magrittr)
+require(reshape2)
+head(RCT_ANOVAS_MASTER.complete)
+tail(RCT_ANOVAS_MASTER.complete)
+dim(RCT_ANOVAS_MASTER.complete)
+summary(RCT_ANOVAS_MASTER.complete)
+RCT_ANOVAS_MASTER_WIDE <-dcast(RCT_ANOVAS_MASTER.complete,ID~Resoponse_Type+Face_Set+Face_Morph, value.var="Frequency") 
+View(RCT_ANOVAS_MASTER_WIDE)
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="1_1_1"] <- "OWO_LSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="1_1_2"] <- "OWO_LSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="1_2_1"] <- "OWO_NUSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="1_2_2"] <- "OWO_NUSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="2_1_1"] <- "NWN_LSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="2_1_2"] <- "NWN_LSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="2_2_1"] <- "NWN_NUSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="2_2_2"] <- "NWN_NUSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="3_1_1"] <- "OWN_LSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="3_1_2"] <- "OWN_LSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="3_2_1"] <- "OWN_NUSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="3_2_2"] <- "OWN_NUSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="4_1_1"] <- "NWO_LSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="4_1_2"] <- "NWO_LSF_MASC"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="4_2_1"] <- "NWO_NUSF_FEM"
+colnames(RCT_ANOVAS_MASTER_WIDE)[colnames(RCT_ANOVAS_MASTER_WIDE)=="4_2_2"] <- "NWO_NUSF_MASC"
+View(RCT_ANOVAS_MASTER_WIDE)
+```
+#####To sum the columns within face morph and response type and append these variables to the data set.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_2 = mutate(RCT_ANOVAS_MASTER_WIDE,OWO_FEM=(OWO_LSF_FEM+OWO_NUSF_FEM), OWO_MASC = (OWO_LSF_MASC+OWO_NUSF_MASC), NWN_FEM = (NWN_LSF_FEM+NWN_NUSF_FEM), NWN_MASC = (NWN_LSF_MASC+NWN_NUSF_MASC), OWN_FEM = (OWN_LSF_FEM+OWN_NUSF_FEM), OWN_MASC = (OWN_LSF_MASC+OWN_NUSF_MASC), NWO_FEM=(NWO_LSF_FEM+NWO_NUSF_FEM), NWO_MASC = (NWO_LSF_MASC+NWO_NUSF_MASC))
+View(RCT_ANOVAS_MASTER_WIDE_2)
+```
+
+
+######Now lets compute sensitivity scores and append them to the data set.
+####Let's first compute hit rate.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_3 = mutate(RCT_ANOVAS_MASTER_WIDE_2,HIT_RATE_FEM = OWO_FEM/(OWO_FEM+NWO_FEM),HIT_RATE_MASC = OWO_MASC/(OWO_MASC+NWO_MASC),FA_RATE_FEM = OWN_FEM/(OWN_FEM+NWN_FEM),FA_RATE_MASC = OWN_MASC/(OWN_MASC+NWN_MASC), MISS_RATE_FEM = 1-HIT_RATE_FEM, MISS_RATE_MASC = 1-HIT_RATE_MASC, CORR_REJ_FEM = 1-FA_RATE_FEM, CORR_REJ_MASC = 1-FA_RATE_MASC)
+View(RCT_ANOVAS_MASTER_WIDE_3)
+```
+
+####To compute psuedo dprime
+```{r}
+RCT_ANOVAS_MASTER_WIDE_4 = mutate(RCT_ANOVAS_MASTER_WIDE_3,dFEM=(HIT_RATE_FEM-FA_RATE_FEM), dMASC = (HIT_RATE_MASC-FA_RATE_MASC))
+summary(RCT_ANOVAS_MASTER_WIDE_4)
+```
+
+####To standardize the variables.
+```{r}
+require(dplyr)
+require(mosaic)
+RCT_ANOVAS_MASTER_WIDE_5 = mutate(RCT_ANOVAS_MASTER_WIDE_4,Z_HIT_RATE_FEM = zscore(HIT_RATE_FEM),ZHIT_RATE_MASC = zscore(HIT_RATE_MASC),ZFA_RATE_FEM= zscore(FA_RATE_FEM), ZFA_RATE_MASC = zscore(FA_RATE_MASC))
+View(RCT_ANOVAS_MASTER_WIDE_5)
+```
+####To compute d' and append it to the data set.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_6 = mutate(RCT_ANOVAS_MASTER_WIDE_5, DFEM=(Z_HIT_RATE_FEM-ZFA_RATE_FEM), DMASC=(ZHIT_RATE_MASC-ZFA_RATE_MASC),CFEM=(Z_HIT_RATE_FEM+ZFA_RATE_FEM)/2, CMASC=(ZHIT_RATE_MASC+ZFA_RATE_MASC)/2)
+View(RCT_ANOVAS_MASTER_WIDE_6)
+```
+
+####Lets reduce the data set to the d'.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_7 = RCT_ANOVAS_MASTER_WIDE_6[c(1,40,41)]
+View(RCT_ANOVAS_MASTER_WIDE_7)
+```
+####Now let's add a column.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_7$ID = as.numeric(RCT_ANOVAS_MASTER_WIDE_7$ID)
+RCT_ANOVAS_MASTER_WIDE_8 <- transform(RCT_ANOVAS_MASTER_WIDE_7, COND=ifelse(ID>49, 0, 1))
+View(RCT_ANOVAS_MASTER_WIDE_8)
+```
+
+####Now lets factor the condition.
+```{r}
+RCT_ANOVAS_MASTER_WIDE_8$COND <- as.factor(RCT_ANOVAS_MASTER_WIDE_8$COND)
+```
+
+
+####Now we need to change the data back to long format.
+```{r}
+data_long <- melt(RCT_ANOVAS_MASTER_WIDE_8,
+        # ID variables - all the variables to keep but not split apart on
+    id.vars=c("ID","COND"),
+        # The source columns
+    measure.vars=c("DFEM", "DMASC"),
+        # Name of the destination column that will identify the original
+        # column that the measurement came from
+    variable.name="Dimorphism",
+    value.name="d"
+)
+View(data_long)
+```
+####To conduct a repeated measures anova.
+```{r}
+require(ez)
+options(scipen=9999)
+MEM_ANOVA_ALL = ezANOVA(data=data_long ,
+                dv =.(d),
+                wid =.(ID),
+                within = .(Dimorphism),
+                between = .(COND),
+                observed = NULL,
+                diff = NULL,
+                reverse_diff = FALSE,
+                type = 3,
+                white.adjust = FALSE,
+                detailed = FALSE,
+                return_aov = FALSE)
+MEM_ANOVA_ALL
+```

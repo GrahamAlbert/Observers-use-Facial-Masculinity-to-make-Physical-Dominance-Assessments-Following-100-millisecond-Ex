@@ -1,0 +1,237 @@
+---
+title: "Memory Facial Threat"
+author: "Graham Albert"
+date: "June 9, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+###To load required packarges
+```{r}
+require(curl) 
+```
+######loading data
+#####for more advanced rotation.
+```{r}
+require(dplyr)
+```
+####for data manipulation.
+```{r}
+require(yaml)
+require(stringi)
+```
+####for correlation plot depiction.
+```{r}
+require(gplots)
+require(ggplot2)
+require(gridExtra)
+require(moments)
+```
+
+###To load glmm.
+```{r}
+require(lme4)
+require(AICcmodavg)
+require(MuMIn)
+require(r2glmm)
+```
+####T
+```{r}
+require(RColorBrewer) # needed for some extra colours in one of the graphs
+require(lmerTest)# to get p-value estimations that are not part of the standard lme4 packages
+```
+
+
+####To load my data set for the mating motivation scale into the  R work space.
+```{r}
+f <- curl("https://raw.githubusercontent.com/GrahamAlbert/Rapid-Classification-Task-Data/master/Rating_MLM_Combine_20200901_Reduced.csv")
+RCT<- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+head(RCT)
+```
+
+####To determine variable names of the data set.
+```{r}
+names(RCT)[1]<-"ID"
+names(RCT)
+
+```
+
+####Lets obtain some summary statistics.
+```{r}
+summary(RCT)
+dim(RCT)
+View(RCT)
+```
+
+####The dependent variable is categorical and dominance rating.
+####We need to factor many of our varaibles.
+```{r}
+require(dplyr)
+RCT = mutate(RCT,ID = as.factor(RCT$ID),Face_Shape = as.factor(RCT$Face_Shape), TrialNum= as.factor(RCT$TrialNum),Face_Set = as.factor(RCT$Face_Set), Morph_Type= as.factor(RCT$Morph_Type), Pic_Number  = as.factor(RCT$Pic_Number))
+View(RCT)
+```
+
+####Lets determine if we effectively factors the variables of interested.
+###We will determine the number of levels for each factor.
+```{r}
+nlevels(RCT$ID)
+nlevels(RCT$Face_Shape)
+nlevels(RCT$TrialNum)
+nlevels(RCT$Face_Set)
+nlevels(RCT$Morph_Type)
+nlevels(RCT$Pic_Number)
+```
+####Now let's windsorize our continuous dependent variable RT.
+
+
+
+
+
+####To recode recall and encoding so that the reference category changes.
+```{R}
+RCT$Face_Set = factor(RCT$Face_Set,
+                             levels = c(1,2),
+                             labels = c("London Face Set", "Nipissing University Face Set"))
+table(RCT$Face_Set)
+RCT$Morph_Type= factor(RCT$Morph_Type ,
+                             levels = c(1,2),
+                             labels = c("Feminized", "Masculinized"))
+table(RCT$Morph_Type )
+
+RCT$Face_Shape = factor(RCT$Face_Shape,
+                             levels = c(1,2),
+                             labels = c("Full Face", "Oval Face"))
+table(RCT$Face_Shape)
+```
+
+
+###To obtain skew and kurtisosis statistics.
+```{r}
+require(psych)
+describe(RCT$Dom)
+```
+
+####Lets proceed with a glmer in which ID is a random effect.
+```{r}
+options(scipen=9999)
+require(lme4)
+M1 = lmer(data=RCT,Dom~Morph_Type*Face_Shape*Face_Set+(1+Morph_Type|ID)+(1|TrialNum)+(1|Pic_Number))
+summary(M1)
+```
+####To generate confidence interrval.
+```{r}
+confint(M1)
+```
+
+
+###To compute adjusted R squared.
+```{r}
+require(MuMIn)
+r.squaredGLMM(M1)
+```
+
+
+
+
+####Let's check our multiple regression assumption set for model 10.
+####First, we can check for homoscedasticity by comparing residuals to the fitted items. 
+```{r}
+plot(fitted(M1), resid(M1, type = "pearson"))
+abline(0,0, col="red")
+```
+####We can also use a QQ-plot to check for normality of residuals. 
+```{r}
+qqnorm(resid(M1)) 
+qqline(resid(M1), col = "red")
+```
+
+###To generate the fixed effects table for the models .
+```{r}
+fixef(M1)
+```
+
+
+
+####Let's generate the AIC for the 8 models.
+```{r}
+require(AICcmodavg)
+print(aictab(list(M1), c("M1"), LL = FALSE))
+```
+
+
+
+####To obtain the ICC for models 4.
+```{r}
+require(sjstats)
+performance::icc(M1)
+```
+
+###To visual model.
+```{r}
+require(effects)
+e <- allEffects(M1)
+print(e)
+plot(e)
+
+```
+
+# allEffects() returns a list, but for our model (where everything can interact with everything), there's only one element
+```{r}
+plot(e,multiline=TRUE,confint=TRUE,ci.style="bars"
+     ,main="Effects of Face Morph on RT"
+     ,xlab="Face Morph"
+     ,ylab="Domininace Rating")
+```
+####Lets make a dataframe containing the data we need for the graph.
+```{R}
+e1 <- e[[1]]
+e.df <- as.data.frame(e1)
+```
+
+####Lets use ggplot.
+```{r}
+require(ggplot2)
+library(ggplot2)
+library(extrafont)
+library(magick)
+loadfonts(device = "win")
+#Save some time and store APA format-related code in an object so you can easily
+#use it in multiple plots
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(size=12,family='serif'),
+        legend.title=element_blank())
+plt3 <- ggplot(e.df,aes(x=Morph_Type,y=fit,color=Face_Shape,shape=Face_Set,ymin=lower,ymax=upper)) + 
+    geom_pointrange(position=position_dodge(width=.1)) + facet_wrap(~Face_Shape) +
+    xlab("Face Morph") + ylab("Dominance Rating")+
+    scale_colour_grey()+
+    apatheme
+plt3
+ggsave(plt3, file = "Figure2.jpg", width =12, height = 7.5, dpi = 900)
+```
+
+
+
+###Lets see what happens when we plot the regression.
+```{r}
+plot(M1)
+extractAIC(M1)
+BIC(M1)
+deviance(M1)
+logLik(M1)
+-2*logLik(M1)
+```
+
+
+####Let's use ggplot to create a regression plot for the data.
+```{r}
+require(sjPlot)
+library(sjmisc)
+plot_model(M1)
+```
+
